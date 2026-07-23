@@ -32,6 +32,17 @@
 
 <p>雨がぽつぽつとふってきた。階段をくだって、鳥居をくぐって、駅にむかった。映画と同じ夜の道を、ひとつの傘で歩いた。</p>
 
+<div>
+<p style="font-size:0.85em;color:#888;margin-bottom:4px;">この記事で使用した曲</p>
+<ol style="font-size:0.85em;color:#888;">
+<li>Lady Gaga - Poker Face (Official Music Video)　/　LadyGagaVEVO</li>
+<li>Ayatake Ezaki - The Beginning Night (Full Album, 2023)　/　Ayatake Ezaki</li>
+<li>NYC Tonight (Sakamoto Ver)　/　s</li>
+</ol>
+</div>
+
+<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://www.google.com">
 <div id="ytA" style="position:absolute; width:0; height:0; overflow:hidden;"></div>
 <div id="ytB" style="position:absolute; width:0; height:0; overflow:hidden;"></div>
 
@@ -41,9 +52,11 @@
   var TRACKS = [{"id":"bESGLojNYSo","start":56},{"id":"YJdKJ8i34wM","start":0},{"id":"BAYlWYKsm94","start":0}];
   var CROSSFADE_MS = 3000;
   var PLAYPAUSE_MS = 1200;
+  var IOS_SWITCH_MS = 400;
+  var IS_IOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   var players = [];
-  var readyCount = 0;
+  var playerReady = [false, false];
   var currentSlot = 0;
   var currentTrackIndex = 0;
   var fadeTimer = null;
@@ -67,71 +80,93 @@
   function onYouTubeIframeAPIReady() {
     players[0] = new YT.Player('ytA', {
       height: '0', width: '0', videoId: TRACKS[0].id,
-      playerVars: { autoplay: 0, controls: 0, start: TRACKS[0].start },
-      events: { onReady: onPlayerReady }
+      playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[0].start },
+      events: { onReady: function () { playerReady[0] = true; } }
     });
     if (TRACKS.length > 1) {
       players[1] = new YT.Player('ytB', {
         height: '0', width: '0', videoId: TRACKS[1].id,
-        playerVars: { autoplay: 0, controls: 0, start: TRACKS[1].start },
-        events: { onReady: onPlayerReady }
+        playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[1].start },
+        events: { onReady: function () { playerReady[1] = true; } }
       });
     }
   }
   window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
-  function onPlayerReady() { readyCount++; }
-  function allReady() { return TRACKS.length > 1 ? readyCount === 2 : readyCount === 1; }
-
   var playBtn = document.getElementById('playBtn1');
   if (playBtn) {
     playBtn.addEventListener('click', function () {
-      if (!allReady()) return;
+      if (!playerReady[currentSlot]) return;
       var player = players[currentSlot];
       if (player.getPlayerState() === 1) {
-        fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
+        if (IS_IOS) {
+          player.pauseVideo();
+        } else {
+          fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
+        }
         playBtn.textContent = '▶';
       } else {
-        player.setVolume(0);
-        player.playVideo();
-        fadeVolume(player, 0, 100, PLAYPAUSE_MS);
+        if (IS_IOS) {
+          player.unMute();
+          player.setVolume(100);
+          player.playVideo();
+        } else {
+          player.setVolume(0);
+          player.playVideo();
+          fadeVolume(player, 0, 100, PLAYPAUSE_MS);
+        }
         playBtn.textContent = '⏸';
       }
     });
   }
 
   function crossfadeTo(targetIndex) {
-    if (!allReady()) return;
     if (targetIndex !== currentTrackIndex + 1) return;
     if (transitionedUpTo >= targetIndex) return;
+    var toSlot = 1 - currentSlot;
+    if (!playerReady[toSlot]) return;
     var fromPlayer = players[currentSlot];
+    var toPlayer = players[toSlot];
     if (fromPlayer.getPlayerState() !== 1) return;
     transitionedUpTo = targetIndex;
 
-    var toSlot = 1 - currentSlot;
-    var toPlayer = players[toSlot];
-    toPlayer.setVolume(0);
-    toPlayer.playVideo();
-
-    var steps = 30, i = 0;
-    var iv = setInterval(function () {
-      i++;
-      var t = i / steps;
-      fromPlayer.setVolume(Math.max(0, Math.round(100 * (1 - t))));
-      toPlayer.setVolume(Math.min(100, Math.round(100 * t)));
-      if (i >= steps) {
-        clearInterval(iv);
-        fromPlayer.pauseVideo();
-        currentSlot = toSlot;
-        currentTrackIndex = targetIndex;
-        var lookahead = currentTrackIndex + 1;
-        if (lookahead < TRACKS.length) {
-          fromPlayer.cueVideoById({ videoId: TRACKS[lookahead].id, startSeconds: TRACKS[lookahead].start });
-        }
-        var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
-        if (btn) btn.style.display = 'none';
+    function finishSwap() {
+      currentSlot = toSlot;
+      currentTrackIndex = targetIndex;
+      var lookahead = currentTrackIndex + 1;
+      if (lookahead < TRACKS.length) {
+        fromPlayer.cueVideoById({ videoId: TRACKS[lookahead].id, startSeconds: TRACKS[lookahead].start });
       }
-    }, CROSSFADE_MS / steps);
+      var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
+      if (btn) btn.style.display = 'none';
+    }
+
+    if (IS_IOS) {
+      toPlayer.unMute();
+      toPlayer.setVolume(100);
+      toPlayer.playVideo();
+      fromPlayer.mute();
+      setTimeout(function () {
+        fromPlayer.pauseVideo();
+        fromPlayer.unMute();
+        finishSwap();
+      }, IOS_SWITCH_MS);
+    } else {
+      toPlayer.setVolume(0);
+      toPlayer.playVideo();
+      var steps = 30, i = 0;
+      var iv = setInterval(function () {
+        i++;
+        var t = i / steps;
+        fromPlayer.setVolume(Math.max(0, Math.round(100 * (1 - t))));
+        toPlayer.setVolume(Math.min(100, Math.round(100 * t)));
+        if (i >= steps) {
+          clearInterval(iv);
+          fromPlayer.pauseVideo();
+          finishSwap();
+        }
+      }, CROSSFADE_MS / steps);
+    }
   }
 
   TRACKS.forEach(function (t, idx) {
