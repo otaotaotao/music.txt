@@ -29,10 +29,11 @@
 <h1>ブログ音楽ジェネレーター</h1>
 <div class="box">
 本文を下のテキストエリアに貼り付けて、曲を入れたい場所に<br>
-<code>[[YouTubeのURL]]</code><br>
-と書いてください（文中でもOK。今回の例文もそのまま入っています）。<br><br>
-・<b>1つ目</b>のマーカー → 「♪¹」ボタン（クリックで再生・もう一度押すと停止／フェード付き。再生中はボタンの色が反転します）<br>
-・<b>2つ目以降</b>のマーカー → 「♪²」「♪³」…という番号付きボタンになり、下の「切り替え方式」で選んだ方式で次の曲に切り替わります。番号は末尾の曲名リストと対応しています
+<code>[[URL]]</code><br>
+と書いてください（文中でもOK）。<br><br>
+対応サービス:<br>
+・<b>YouTube / SoundCloud</b> → 非表示プレイヤーで再生。1つ目は「♪¹」ボタン（再生・停止・フェード付き）、2つ目以降は番号付きボタンで自動/手動切り替え<br>
+・<b>Spotify / Apple Music / Bandcamp</b> → その場に見える通常の埋め込みプレイヤーを設置（ネイティブの再生ボタンで聴く形式。フェードや自動切り替えの対象にはなりません）
 </div>
 
 <h2>本文</h2>
@@ -73,7 +74,7 @@
 
 <label class="mode-option">
   <input type="checkbox" id="creditsCheckbox" checked>
-  本文末尾に曲名・アーティスト名の一覧を追加する<small>YouTubeから動画タイトルとチャンネル名を自動取得します（生成に少し時間がかかります）。</small>
+  本文末尾に曲名・アーティスト名の一覧を追加する<small>各サービスから曲タイトルとアーティスト名を自動取得します（生成に少し時間がかかります）。</small>
 </label>
 
 <br>
@@ -99,11 +100,16 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
   var IS_IOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   var players = [];
-  var playerReady = [false, false];
-  var currentSlot = 0;
+  var playerReady = [];
   var currentTrackIndex = 0;
   var fadeTimer = null;
   var transitionedUpTo = 0;
+  var ytQueue = [];
+
+  window.onYouTubeIframeAPIReady = function () {
+    ytQueue.forEach(function (fn) { fn(); });
+    ytQueue = [];
+  };
 
   function fadeVolume(player, from, to, duration, onDone) {
     if (fadeTimer) clearInterval(fadeTimer);
@@ -123,10 +129,10 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
   function tryPlayUntil(player, maxAttempts, onDone) {
     var attempt = 0;
     function attemptPlay() {
-      player.playVideo();
+      player.play();
       attempt++;
       setTimeout(function () {
-        var playing = player.getPlayerState() === 1;
+        var playing = player.isPlaying();
         if (playing || attempt > maxAttempts) {
           if (onDone) onDone(playing);
         } else {
@@ -137,6 +143,45 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
     attemptPlay();
   }
 
+  function makeYouTubePlayer(elementId, index, track) {
+    var yt = null;
+    function init() {
+      yt = new YT.Player(elementId, {
+        height: '0', width: '0', videoId: track.id,
+        playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: track.start },
+        events: { onReady: function () { onPlayerReady(index); } }
+      });
+    }
+    if (window.YT && window.YT.Player) { init(); } else { ytQueue.push(init); }
+    return {
+      play: function () { yt.playVideo(); },
+      pause: function () { yt.pauseVideo(); },
+      isPlaying: function () { return !!yt && yt.getPlayerState() === 1; },
+      setVolume: function (v) { yt.setVolume(v); },
+      mute: function () { yt.mute(); },
+      unmute: function () { yt.unMute(); },
+      seekTo: function (s) { yt.seekTo(s, true); }
+    };
+  }
+
+  function makeSoundCloudPlayer(elementId, index, track) {
+    var widget = SC.Widget(document.getElementById(elementId));
+    var playingFlag = false;
+    widget.bind(SC.Widget.Events.READY, function () { onPlayerReady(index); });
+    widget.bind(SC.Widget.Events.PLAY, function () { playingFlag = true; });
+    widget.bind(SC.Widget.Events.PAUSE, function () { playingFlag = false; });
+    widget.bind(SC.Widget.Events.FINISH, function () { playingFlag = false; });
+    return {
+      play: function () { widget.play(); },
+      pause: function () { widget.pause(); },
+      isPlaying: function () { return playingFlag; },
+      setVolume: function (v) { widget.setVolume(v); },
+      mute: function () { widget.setVolume(0); },
+      unmute: function () { widget.setVolume(100); },
+      seekTo: function (s) { widget.seekTo(Math.round(s * 1000)); }
+    };
+  }
+
   function onPlayerReady(index) {
     playerReady[index] = true;
     if (IS_IOS) {
@@ -144,48 +189,39 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
       var startAt = (TRACKS[index] && TRACKS[index].start) || 0;
       p.mute();
       tryPlayUntil(p, 1, function () {
-        p.pauseVideo();
-        p.seekTo(startAt, true);
+        p.pause();
+        p.seekTo(startAt);
       });
     }
   }
 
-  function onYouTubeIframeAPIReady() {
-    players[0] = new YT.Player('ytA', {
-      height: '0', width: '0', videoId: TRACKS[0].id,
-      playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[0].start },
-      events: { onReady: function () { onPlayerReady(0); } }
-    });
-    if (TRACKS.length > 1) {
-      players[1] = new YT.Player('ytB', {
-        height: '0', width: '0', videoId: TRACKS[1].id,
-        playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[1].start },
-        events: { onReady: function () { onPlayerReady(1); } }
-      });
-    }
-  }
-  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+  TRACKS.forEach(function (t, i) {
+    playerReady[i] = false;
+    players[i] = t.platform === 'soundcloud'
+      ? makeSoundCloudPlayer('slot' + i, i, t)
+      : makeYouTubePlayer('slot' + i, i, t);
+  });
 
   var playBtn = document.getElementById('playBtn1');
   if (playBtn) {
     playBtn.addEventListener('click', function () {
-      if (!playerReady[currentSlot]) return;
-      var player = players[currentSlot];
-      if (player.getPlayerState() === 1) {
+      if (!playerReady[currentTrackIndex]) return;
+      var player = players[currentTrackIndex];
+      if (player.isPlaying()) {
         if (IS_IOS) {
-          player.pauseVideo();
+          player.pause();
         } else {
-          fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
+          fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pause(); });
         }
         playBtn.classList.remove('playing');
       } else {
         if (IS_IOS) {
-          player.unMute();
+          player.unmute();
           player.setVolume(100);
           tryPlayUntil(player, 3, function () {});
         } else {
           player.setVolume(0);
-          player.playVideo();
+          player.play();
           fadeVolume(player, 0, 100, PLAYPAUSE_MS);
         }
         playBtn.classList.add('playing');
@@ -196,39 +232,33 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
   function crossfadeTo(targetIndex) {
     if (targetIndex !== currentTrackIndex + 1) return;
     if (transitionedUpTo >= targetIndex) return;
-    var toSlot = 1 - currentSlot;
-    if (!playerReady[toSlot]) return;
-    var fromPlayer = players[currentSlot];
-    var toPlayer = players[toSlot];
-    if (fromPlayer.getPlayerState() !== 1) return;
+    if (!playerReady[targetIndex]) return;
+    var fromPlayer = players[currentTrackIndex];
+    var toPlayer = players[targetIndex];
+    if (!fromPlayer.isPlaying()) return;
     transitionedUpTo = targetIndex;
 
     function finishSwap() {
-      currentSlot = toSlot;
       currentTrackIndex = targetIndex;
-      var lookahead = currentTrackIndex + 1;
-      if (lookahead < TRACKS.length) {
-        fromPlayer.cueVideoById({ videoId: TRACKS[lookahead].id, startSeconds: TRACKS[lookahead].start });
-      }
       var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
       if (btn) btn.style.display = 'none';
       if (playBtn) {
         var sup = playBtn.querySelector('sup');
-        if (sup) sup.textContent = String(targetIndex + 1);
+        if (sup) sup.textContent = String(TRACKS[targetIndex].displayNum);
       }
     }
 
     if (IS_IOS) {
-      toPlayer.unMute();
+      toPlayer.unmute();
       toPlayer.setVolume(100);
       tryPlayUntil(toPlayer, 3, function () {
         fromPlayer.mute();
-        fromPlayer.pauseVideo();
+        fromPlayer.pause();
         finishSwap();
       });
     } else {
       toPlayer.setVolume(0);
-      toPlayer.playVideo();
+      toPlayer.play();
       var steps = 30, i = 0;
       var iv = setInterval(function () {
         i++;
@@ -237,7 +267,7 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
         toPlayer.setVolume(Math.min(100, Math.round(100 * t)));
         if (i >= steps) {
           clearInterval(iv);
-          fromPlayer.pauseVideo();
+          fromPlayer.pause();
           finishSwap();
         }
       }, CROSSFADE_MS / steps);
@@ -329,11 +359,73 @@ function parseYouTubeInput(input) {
   }
 }
 
-function fetchTrackMeta(id) {
-  return fetch('https://www.youtube.com/oembed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id) + '&format=json')
+function parseSoundCloudInput(input) {
+  input = (input || '').trim();
+  try {
+    var url = new URL(input);
+    return { url: url.origin + url.pathname };
+  } catch (e) {
+    return null;
+  }
+}
+
+function detectPlatform(input) {
+  try {
+    var url = new URL((input || '').trim());
+    var h = url.hostname.replace(/^www\./, '');
+    if (h === 'youtu.be' || h === 'youtube.com' || h.endsWith('.youtube.com')) return 'youtube';
+    if (h === 'soundcloud.com' || h.endsWith('.soundcloud.com')) return 'soundcloud';
+    if (h === 'open.spotify.com') return 'spotify';
+    if (h === 'music.apple.com') return 'applemusic';
+    if (h === 'bandcamp.com' || h.endsWith('.bandcamp.com')) return 'bandcamp';
+  } catch (e) {}
+  return null;
+}
+
+var PLATFORM_NAMES = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', applemusic: 'Apple Music', bandcamp: 'Bandcamp' };
+
+function oembedEndpoint(platform, url) {
+  if (platform === 'youtube') return 'https://www.youtube.com/oembed?url=' + encodeURIComponent(url) + '&format=json';
+  if (platform === 'soundcloud') return 'https://soundcloud.com/oembed?url=' + encodeURIComponent(url) + '&format=json';
+  if (platform === 'spotify') return 'https://open.spotify.com/oembed?url=' + encodeURIComponent(url);
+  if (platform === 'bandcamp') return 'https://bandcamp.com/oembed?url=' + encodeURIComponent(url) + '&format=json';
+  return null;
+}
+
+function fetchTrackMeta(platform, url) {
+  var endpoint = oembedEndpoint(platform, url);
+  if (!endpoint) return Promise.resolve(null);
+  return fetch(endpoint)
     .then(function (res) { if (!res.ok) throw new Error('oembed failed'); return res.json(); })
-    .then(function (data) { return { title: data.title, author: data.author_name }; })
+    .then(function (data) { return { title: data.title, author: data.author_name, html: data.html }; })
     .catch(function () { return null; });
+}
+
+function fallbackLabel(platform, url) {
+  var seg = url;
+  try {
+    var u = new URL(url);
+    seg = decodeURIComponent((u.pathname.split('/').filter(Boolean).pop() || u.hostname)).replace(/[-_]/g, ' ');
+  } catch (e) {}
+  return seg + '（' + (PLATFORM_NAMES[platform] || platform) + '）';
+}
+
+function buildVisibleEmbed(platform, url, meta) {
+  if (meta && meta.html) {
+    return '<div class="music-embed">' + meta.html + '</div>';
+  }
+  if (platform === 'spotify') {
+    var m = /open\.spotify\.com\/(track|album|playlist|episode|show)\/([A-Za-z0-9]+)/.exec(url);
+    if (m) {
+      return '<div class="music-embed"><iframe style="border-radius:12px" src="https://open.spotify.com/embed/' + m[1] + '/' + m[2] + '" width="100%" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe></div>';
+    }
+  }
+  if (platform === 'applemusic') {
+    var embedUrl = url.replace('music.apple.com', 'embed.music.apple.com');
+    return '<div class="music-embed"><iframe allow="autoplay *; encrypted-media *; fullscreen *" frameborder="0" height="150" style="width:100%;overflow:hidden;border-radius:10px;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="' + embedUrl + '"></iframe></div>';
+  }
+  var label = platform === 'bandcamp' ? 'Bandcampで聴く' : 'リンクを開く';
+  return '<div class="music-embed"><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="music-link">♪ ' + label + ' ↗</a></div>';
 }
 
 document.getElementById('generateBtn').addEventListener('click', async function () {
@@ -342,28 +434,49 @@ document.getElementById('generateBtn').addEventListener('click', async function 
   var mode = document.querySelector('input[name="mode"]:checked').value;
   var includeCredits = document.getElementById('creditsCheckbox').checked;
   var markerRe = /\[\[\s*([^\]]+?)\s*\]\]/g;
-  var tracks = [];
+
+  var allTracks = [];
+  var controllableTracks = [];
   var invalidUrls = [];
 
   var tokenized = raw.replace(markerRe, function (whole, urlPart) {
-    var parsed = parseYouTubeInput(urlPart);
-    var idx = tracks.length;
-    if (!parsed.id) invalidUrls.push(urlPart.trim());
-    tracks.push(parsed);
-    return '@@MUSIC' + idx + '@@';
+    var trimmed = urlPart.trim();
+    var platform = detectPlatform(trimmed);
+    var globalIdx = allTracks.length;
+    var token = '@@MUSIC' + globalIdx + '@@';
+
+    if (platform === 'youtube') {
+      var yt = parseYouTubeInput(trimmed);
+      if (!yt.id) { invalidUrls.push(trimmed); allTracks.push({ platform: 'invalid' }); return token; }
+      var cIdx1 = controllableTracks.length;
+      controllableTracks.push({ platform: 'youtube', id: yt.id, start: yt.start, displayNum: globalIdx + 1 });
+      allTracks.push({ platform: 'youtube', url: trimmed, controllableIndex: cIdx1 });
+    } else if (platform === 'soundcloud') {
+      var sc = parseSoundCloudInput(trimmed);
+      if (!sc) { invalidUrls.push(trimmed); allTracks.push({ platform: 'invalid' }); return token; }
+      var cIdx2 = controllableTracks.length;
+      controllableTracks.push({ platform: 'soundcloud', url: sc.url, displayNum: globalIdx + 1 });
+      allTracks.push({ platform: 'soundcloud', url: trimmed, controllableIndex: cIdx2 });
+    } else if (platform === 'spotify' || platform === 'applemusic' || platform === 'bandcamp') {
+      allTracks.push({ platform: platform, url: trimmed, controllableIndex: null });
+    } else {
+      invalidUrls.push(trimmed);
+      allTracks.push({ platform: 'invalid' });
+    }
+    return token;
   });
 
   var resultEl = document.getElementById('result');
   var errorEl = document.getElementById('errorMsg');
 
-  if (tracks.length === 0) {
-    errorEl.textContent = '[[ YouTubeのURL ]] の形式で、曲を入れたい場所にマーカーを書いてください。';
+  if (allTracks.length === 0) {
+    errorEl.textContent = '[[ URL ]] の形式で、曲を入れたい場所にマーカーを書いてください。';
     errorEl.style.display = 'block';
     resultEl.style.display = 'none';
     return;
   }
   if (invalidUrls.length > 0) {
-    errorEl.textContent = '次のURLからYouTubeの動画IDを読み取れませんでした: ' + invalidUrls.join(' / ');
+    errorEl.textContent = '次のURLを認識できませんでした（対応: YouTube / SoundCloud / Spotify / Apple Music / Bandcamp）: ' + invalidUrls.join(' / ');
     errorEl.style.display = 'block';
     resultEl.style.display = 'none';
     return;
@@ -374,7 +487,9 @@ document.getElementById('generateBtn').addEventListener('click', async function 
   if (includeCredits) {
     genBtn.disabled = true;
     genBtn.textContent = '曲情報を取得中...';
-    metas = await Promise.all(tracks.map(function (t) { return fetchTrackMeta(t.id); }));
+    metas = await Promise.all(allTracks.map(function (t) {
+      return t.platform === 'invalid' ? Promise.resolve(null) : fetchTrackMeta(t.platform, t.url);
+    }));
     genBtn.disabled = false;
     genBtn.textContent = 'HTMLを生成する';
   }
@@ -382,17 +497,28 @@ document.getElementById('generateBtn').addEventListener('click', async function 
   var escaped = escapeHtml(tokenized);
   var rawParagraphs = escaped.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
 
+  function replaceToken(idxStr) {
+    var idx = parseInt(idxStr, 10);
+    var t = allTracks[idx];
+    if (!t || t.platform === 'invalid') return { html: '', transitionCIdx: null };
+    if (t.controllableIndex !== null) {
+      var cIdx = t.controllableIndex;
+      if (cIdx === 0) return { html: '<button id="playBtn1" class="music-btn">♪<sup>1</sup></button>', transitionCIdx: null };
+      return { html: '', transitionCIdx: cIdx };
+    }
+    return { html: buildVisibleEmbed(t.platform, t.url, metas[idx]), transitionCIdx: null };
+  }
+
   var bodyHtml;
-  var style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.music-btn sup {\n  font-size: 0.65em;\n}\n.music-btn.playing {\n  background: #333;\n  color: #fff;\n  border-color: #333;\n}\n</style>';
+  var style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.music-btn sup {\n  font-size: 0.65em;\n}\n.music-btn.playing {\n  background: #333;\n  color: #fff;\n  border-color: #333;\n}\n.music-embed {\n  margin: 16px 0;\n}\n.music-link {\n  display: inline-block;\n  padding: 8px 14px;\n  border: 1px solid #ccc;\n  border-radius: 20px;\n  background: #f7f7f7;\n  text-decoration: none;\n  color: #333;\n  font-size: 0.9em;\n}\n</style>';
 
   if (mode === 'tap') {
     var bodyParts = rawParagraphs.map(function (p, i) {
       var transitionIndices = [];
       var htmlP = p.replace(/@@MUSIC(\d+)@@/g, function (whole, idxStr) {
-        var idx = parseInt(idxStr, 10);
-        if (idx === 0) return '<button id="playBtn1" class="music-btn">♪<sup>1</sup></button>';
-        transitionIndices.push(idx);
-        return '';
+        var r = replaceToken(idxStr);
+        if (r.transitionCIdx !== null) transitionIndices.push(r.transitionCIdx);
+        return r.html;
       }).replace(/\n/g, '<br>\n');
       var initStyle = i === 0 ? 'display:block;opacity:1;' : 'display:none;opacity:0;';
       var attrs = 'class="reveal-p" data-idx="' + i + '" style="' + initStyle + '"';
@@ -400,47 +526,79 @@ document.getElementById('generateBtn').addEventListener('click', async function 
       return '<p ' + attrs + '>' + htmlP + '</p>';
     });
     bodyHtml = bodyParts.join('\n\n') + '\n\n<div id="continueBtn" class="continue-btn">▼</div>';
-    style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.music-btn sup {\n  font-size: 0.65em;\n}\n.music-btn.playing {\n  background: #333;\n  color: #fff;\n  border-color: #333;\n}\n.reveal-p {\n  transition: opacity 0.8s ease;\n}\n.continue-btn {\n  text-align: center;\n  font-size: 1.6em;\n  color: #999;\n  cursor: pointer;\n  padding: 24px 0;\n  user-select: none;\n  animation: musicblog-pulse 1.6s ease-in-out infinite;\n}\n@keyframes musicblog-pulse {\n  0%, 100% { opacity: 0.35; }\n  50% { opacity: 1; }\n}\n</style>';
+    style = style.replace('</style>', '.reveal-p {\n  transition: opacity 0.8s ease;\n}\n.continue-btn {\n  text-align: center;\n  font-size: 1.6em;\n  color: #999;\n  cursor: pointer;\n  padding: 24px 0;\n  user-select: none;\n  animation: musicblog-pulse 1.6s ease-in-out infinite;\n}\n@keyframes musicblog-pulse {\n  0%, 100% { opacity: 0.35; }\n  50% { opacity: 1; }\n}\n</style>');
   } else {
     bodyHtml = rawParagraphs.map(function (p) {
       return '<p>' + p.replace(/\n/g, '<br>\n') + '</p>';
     }).join('\n\n');
     bodyHtml = bodyHtml.replace(/@@MUSIC(\d+)@@/g, function (whole, idxStr) {
       var idx = parseInt(idxStr, 10);
-      if (idx === 0) return '<button id="playBtn1" class="music-btn">♪<sup>1</sup></button>';
-      return '<span id="marker' + idx + '" style="display:inline-block;width:0;height:1px;"></span>' +
-             '<button class="music-btn transition-btn" data-target="' + idx + '">♪<sup>' + (idx + 1) + '</sup></button>';
+      var t = allTracks[idx];
+      if (!t || t.platform === 'invalid') return '';
+      if (t.controllableIndex !== null) {
+        var cIdx = t.controllableIndex;
+        if (cIdx === 0) return '<button id="playBtn1" class="music-btn">♪<sup>1</sup></button>';
+        return '<span id="marker' + cIdx + '" style="display:inline-block;width:0;height:1px;"></span>' +
+               '<button class="music-btn transition-btn" data-target="' + cIdx + '">♪<sup>' + (idx + 1) + '</sup></button>';
+      }
+      return buildVisibleEmbed(t.platform, t.url, metas[idx]);
     });
   }
 
   if (includeCredits) {
-    var creditItems = tracks.map(function (t, i) {
-      var m = metas[i];
-      var label = m ? (m.title + (m.author ? '　/　' + m.author : '')) : t.id;
-      return '<li>♪<sup>' + (i + 1) + '</sup>　' + escapeHtml(label) + '</li>';
-    }).join('\n');
+    var creditItems = allTracks.map(function (t, idx) {
+      if (t.platform === 'invalid') return '';
+      var m = metas[idx];
+      var label = m ? (m.title + (m.author ? '　/　' + m.author : '')) : fallbackLabel(t.platform, t.url);
+      var prefix = t.controllableIndex !== null ? ('♪<sup>' + (idx + 1) + '</sup>　') : '♪　';
+      return '<li>' + prefix + escapeHtml(label) + '</li>';
+    }).filter(function (s) { return s.length > 0; }).join('\n');
     var creditsAttrs = mode === 'tap' ? ' id="creditsBlock" style="display:none;opacity:0;transition:opacity 0.8s ease;"' : '';
     var creditsBlock = '<div' + creditsAttrs + '>\n<p style="font-size:0.85em;color:#888;margin-bottom:4px;">この記事で使用した曲</p>\n<ul style="font-size:0.85em;color:#888;list-style:none;padding:0;">\n' + creditItems + '\n</ul>\n</div>';
     bodyHtml = bodyHtml + '\n\n' + creditsBlock;
   }
 
-  var tracksJson = JSON.stringify(tracks).replace(/</g, '\\u003c');
-  var trigger = mode === 'manual' ? RUNTIME_TRIGGER_MANUAL : (mode === 'tap' ? RUNTIME_TRIGGER_TAP : RUNTIME_TRIGGER_AUTO);
-  var script = '(function () {\n' + RUNTIME_CORE.replace('__TRACKS_JSON__', tracksJson) + trigger + '})();';
+  var usesYouTube = controllableTracks.some(function (t) { return t.platform === 'youtube'; });
+  var usesSoundCloud = controllableTracks.some(function (t) { return t.platform === 'soundcloud'; });
 
-  var playerDivs = '<link rel="preconnect" href="https://www.youtube.com">\n<link rel="preconnect" href="https://www.google.com">\n' +
-    '<div id="ytA" style="position:absolute; width:0; height:0; overflow:hidden;"></div>\n' +
-    (tracks.length > 1 ? '<div id="ytB" style="position:absolute; width:0; height:0; overflow:hidden;"></div>\n' : '');
+  var preconnects = '';
+  if (usesYouTube) preconnects += '<link rel="preconnect" href="https://www.youtube.com">\n<link rel="preconnect" href="https://www.google.com">\n';
+  if (usesSoundCloud) preconnects += '<link rel="preconnect" href="https://w.soundcloud.com">\n';
 
-  var finalHtml = bodyHtml + '\n\n' + playerDivs + '\n<script src="https://www.youtube.com/iframe_api"><\/script>\n<script>\n' + script + '\n<\/script>\n\n' + style;
+  var playerDivs = controllableTracks.map(function (t, i) {
+    if (t.platform === 'soundcloud') {
+      var src = 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(t.url) +
+        '&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&visual=false';
+      return '<iframe id="slot' + i + '" style="position:absolute;width:0;height:0;overflow:hidden;border:0;" scrolling="no" frameborder="no" src="' + src + '"></iframe>';
+    }
+    return '<div id="slot' + i + '" style="position:absolute;width:0;height:0;overflow:hidden;"></div>';
+  }).join('\n');
+
+  var scriptBlock = '';
+  if (controllableTracks.length > 0) {
+    var apiScripts = '';
+    if (usesYouTube) apiScripts += '<script src="https://www.youtube.com/iframe_api"><\/script>\n';
+    if (usesSoundCloud) apiScripts += '<script src="https://w.soundcloud.com/player/api.js"><\/script>\n';
+
+    var tracksJson = JSON.stringify(controllableTracks).replace(/</g, '\\u003c');
+    var trigger = mode === 'manual' ? RUNTIME_TRIGGER_MANUAL : (mode === 'tap' ? RUNTIME_TRIGGER_TAP : RUNTIME_TRIGGER_AUTO);
+    var script = '(function () {\n' + RUNTIME_CORE.replace('__TRACKS_JSON__', tracksJson) + trigger + '})();';
+    scriptBlock = apiScripts + '<script>\n' + script + '\n<\/script>\n';
+  }
+
+  var finalHtml = bodyHtml + '\n\n' + preconnects + playerDivs + '\n' + scriptBlock + '\n' + style;
 
   document.getElementById('outputHtml').value = finalHtml;
 
   var listEl = document.getElementById('trackList');
   listEl.innerHTML = '';
-  tracks.forEach(function (t, idx) {
+  allTracks.forEach(function (t, idx) {
+    if (t.platform === 'invalid') return;
     var li = document.createElement('li');
-    li.textContent = (idx === 0 ? '再生ボタン: ' : idx + '曲目へのトランジション: ') + t.id + (t.start ? ' (' + t.start + '秒から)' : '');
+    var kind = t.controllableIndex !== null
+      ? (t.controllableIndex === 0 ? '再生ボタン' : t.controllableIndex + '曲目へのトランジション')
+      : '見える埋め込み';
+    li.textContent = '[' + (PLATFORM_NAMES[t.platform] || t.platform) + '] ' + kind + ': ' + t.url;
     listEl.appendChild(li);
   });
 

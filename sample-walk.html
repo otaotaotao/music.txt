@@ -43,23 +43,28 @@
 
 <link rel="preconnect" href="https://www.youtube.com">
 <link rel="preconnect" href="https://www.google.com">
-<div id="ytA" style="position:absolute; width:0; height:0; overflow:hidden;"></div>
-<div id="ytB" style="position:absolute; width:0; height:0; overflow:hidden;"></div>
-
+<div id="slot0" style="position:absolute;width:0;height:0;overflow:hidden;"></div>
+<div id="slot1" style="position:absolute;width:0;height:0;overflow:hidden;"></div>
+<div id="slot2" style="position:absolute;width:0;height:0;overflow:hidden;"></div>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 (function () {
-  var TRACKS = [{"id":"bESGLojNYSo","start":56},{"id":"YJdKJ8i34wM","start":0},{"id":"BAYlWYKsm94","start":0}];
+  var TRACKS = [{"platform":"youtube","id":"bESGLojNYSo","start":56,"displayNum":1},{"platform":"youtube","id":"YJdKJ8i34wM","start":0,"displayNum":2},{"platform":"youtube","id":"BAYlWYKsm94","start":0,"displayNum":3}];
   var CROSSFADE_MS = 3000;
   var PLAYPAUSE_MS = 1200;
   var IS_IOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   var players = [];
-  var playerReady = [false, false];
-  var currentSlot = 0;
+  var playerReady = [];
   var currentTrackIndex = 0;
   var fadeTimer = null;
   var transitionedUpTo = 0;
+  var ytQueue = [];
+
+  window.onYouTubeIframeAPIReady = function () {
+    ytQueue.forEach(function (fn) { fn(); });
+    ytQueue = [];
+  };
 
   function fadeVolume(player, from, to, duration, onDone) {
     if (fadeTimer) clearInterval(fadeTimer);
@@ -79,10 +84,10 @@
   function tryPlayUntil(player, maxAttempts, onDone) {
     var attempt = 0;
     function attemptPlay() {
-      player.playVideo();
+      player.play();
       attempt++;
       setTimeout(function () {
-        var playing = player.getPlayerState() === 1;
+        var playing = player.isPlaying();
         if (playing || attempt > maxAttempts) {
           if (onDone) onDone(playing);
         } else {
@@ -93,6 +98,45 @@
     attemptPlay();
   }
 
+  function makeYouTubePlayer(elementId, index, track) {
+    var yt = null;
+    function init() {
+      yt = new YT.Player(elementId, {
+        height: '0', width: '0', videoId: track.id,
+        playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: track.start },
+        events: { onReady: function () { onPlayerReady(index); } }
+      });
+    }
+    if (window.YT && window.YT.Player) { init(); } else { ytQueue.push(init); }
+    return {
+      play: function () { yt.playVideo(); },
+      pause: function () { yt.pauseVideo(); },
+      isPlaying: function () { return !!yt && yt.getPlayerState() === 1; },
+      setVolume: function (v) { yt.setVolume(v); },
+      mute: function () { yt.mute(); },
+      unmute: function () { yt.unMute(); },
+      seekTo: function (s) { yt.seekTo(s, true); }
+    };
+  }
+
+  function makeSoundCloudPlayer(elementId, index, track) {
+    var widget = SC.Widget(document.getElementById(elementId));
+    var playingFlag = false;
+    widget.bind(SC.Widget.Events.READY, function () { onPlayerReady(index); });
+    widget.bind(SC.Widget.Events.PLAY, function () { playingFlag = true; });
+    widget.bind(SC.Widget.Events.PAUSE, function () { playingFlag = false; });
+    widget.bind(SC.Widget.Events.FINISH, function () { playingFlag = false; });
+    return {
+      play: function () { widget.play(); },
+      pause: function () { widget.pause(); },
+      isPlaying: function () { return playingFlag; },
+      setVolume: function (v) { widget.setVolume(v); },
+      mute: function () { widget.setVolume(0); },
+      unmute: function () { widget.setVolume(100); },
+      seekTo: function (s) { widget.seekTo(Math.round(s * 1000)); }
+    };
+  }
+
   function onPlayerReady(index) {
     playerReady[index] = true;
     if (IS_IOS) {
@@ -100,48 +144,39 @@
       var startAt = (TRACKS[index] && TRACKS[index].start) || 0;
       p.mute();
       tryPlayUntil(p, 1, function () {
-        p.pauseVideo();
-        p.seekTo(startAt, true);
+        p.pause();
+        p.seekTo(startAt);
       });
     }
   }
 
-  function onYouTubeIframeAPIReady() {
-    players[0] = new YT.Player('ytA', {
-      height: '0', width: '0', videoId: TRACKS[0].id,
-      playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[0].start },
-      events: { onReady: function () { onPlayerReady(0); } }
-    });
-    if (TRACKS.length > 1) {
-      players[1] = new YT.Player('ytB', {
-        height: '0', width: '0', videoId: TRACKS[1].id,
-        playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[1].start },
-        events: { onReady: function () { onPlayerReady(1); } }
-      });
-    }
-  }
-  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+  TRACKS.forEach(function (t, i) {
+    playerReady[i] = false;
+    players[i] = t.platform === 'soundcloud'
+      ? makeSoundCloudPlayer('slot' + i, i, t)
+      : makeYouTubePlayer('slot' + i, i, t);
+  });
 
   var playBtn = document.getElementById('playBtn1');
   if (playBtn) {
     playBtn.addEventListener('click', function () {
-      if (!playerReady[currentSlot]) return;
-      var player = players[currentSlot];
-      if (player.getPlayerState() === 1) {
+      if (!playerReady[currentTrackIndex]) return;
+      var player = players[currentTrackIndex];
+      if (player.isPlaying()) {
         if (IS_IOS) {
-          player.pauseVideo();
+          player.pause();
         } else {
-          fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
+          fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pause(); });
         }
         playBtn.classList.remove('playing');
       } else {
         if (IS_IOS) {
-          player.unMute();
+          player.unmute();
           player.setVolume(100);
           tryPlayUntil(player, 3, function () {});
         } else {
           player.setVolume(0);
-          player.playVideo();
+          player.play();
           fadeVolume(player, 0, 100, PLAYPAUSE_MS);
         }
         playBtn.classList.add('playing');
@@ -152,39 +187,33 @@
   function crossfadeTo(targetIndex) {
     if (targetIndex !== currentTrackIndex + 1) return;
     if (transitionedUpTo >= targetIndex) return;
-    var toSlot = 1 - currentSlot;
-    if (!playerReady[toSlot]) return;
-    var fromPlayer = players[currentSlot];
-    var toPlayer = players[toSlot];
-    if (fromPlayer.getPlayerState() !== 1) return;
+    if (!playerReady[targetIndex]) return;
+    var fromPlayer = players[currentTrackIndex];
+    var toPlayer = players[targetIndex];
+    if (!fromPlayer.isPlaying()) return;
     transitionedUpTo = targetIndex;
 
     function finishSwap() {
-      currentSlot = toSlot;
       currentTrackIndex = targetIndex;
-      var lookahead = currentTrackIndex + 1;
-      if (lookahead < TRACKS.length) {
-        fromPlayer.cueVideoById({ videoId: TRACKS[lookahead].id, startSeconds: TRACKS[lookahead].start });
-      }
       var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
       if (btn) btn.style.display = 'none';
       if (playBtn) {
         var sup = playBtn.querySelector('sup');
-        if (sup) sup.textContent = String(targetIndex + 1);
+        if (sup) sup.textContent = String(TRACKS[targetIndex].displayNum);
       }
     }
 
     if (IS_IOS) {
-      toPlayer.unMute();
+      toPlayer.unmute();
       toPlayer.setVolume(100);
       tryPlayUntil(toPlayer, 3, function () {
         fromPlayer.mute();
-        fromPlayer.pauseVideo();
+        fromPlayer.pause();
         finishSwap();
       });
     } else {
       toPlayer.setVolume(0);
-      toPlayer.playVideo();
+      toPlayer.play();
       var steps = 30, i = 0;
       var iv = setInterval(function () {
         i++;
@@ -193,7 +222,7 @@
         toPlayer.setVolume(Math.min(100, Math.round(100 * t)));
         if (i >= steps) {
           clearInterval(iv);
-          fromPlayer.pauseVideo();
+          fromPlayer.pause();
           finishSwap();
         }
       }, CROSSFADE_MS / steps);
@@ -234,6 +263,19 @@
   background: #333;
   color: #fff;
   border-color: #333;
+}
+.music-embed {
+  margin: 16px 0;
+}
+.music-link {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  background: #f7f7f7;
+  text-decoration: none;
+  color: #333;
+  font-size: 0.9em;
 }
 </style>
 
