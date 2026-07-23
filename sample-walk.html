@@ -77,17 +77,31 @@
     }, duration / steps);
   }
 
+  function onPlayerReady(index) {
+    playerReady[index] = true;
+    if (IS_IOS) {
+      var p = players[index];
+      var startAt = (TRACKS[index] && TRACKS[index].start) || 0;
+      p.mute();
+      p.playVideo();
+      setTimeout(function () {
+        p.pauseVideo();
+        p.seekTo(startAt, true);
+      }, 300);
+    }
+  }
+
   function onYouTubeIframeAPIReady() {
     players[0] = new YT.Player('ytA', {
       height: '0', width: '0', videoId: TRACKS[0].id,
       playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[0].start },
-      events: { onReady: function () { playerReady[0] = true; } }
+      events: { onReady: function () { onPlayerReady(0); } }
     });
     if (TRACKS.length > 1) {
       players[1] = new YT.Player('ytB', {
         height: '0', width: '0', videoId: TRACKS[1].id,
         playerVars: { autoplay: 0, controls: 0, playsinline: 1, start: TRACKS[1].start },
-        events: { onReady: function () { playerReady[1] = true; } }
+        events: { onReady: function () { onPlayerReady(1); } }
       });
     }
   }
