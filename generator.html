@@ -31,8 +31,8 @@
 本文を下のテキストエリアに貼り付けて、曲を入れたい場所に<br>
 <code>[[YouTubeのURL]]</code><br>
 と書いてください（文中でもOK。今回の例文もそのまま入っています）。<br><br>
-・<b>1つ目</b>のマーカー → 「▶」ボタン（クリックで再生・もう一度押すと⏸で停止／フェード付き）<br>
-・<b>2つ目以降</b>のマーカー → 下の「切り替え方式」で選んだ方式で次の曲に切り替わります
+・<b>1つ目</b>のマーカー → 「♪¹」ボタン（クリックで再生・もう一度押すと停止／フェード付き。再生中はボタンの色が反転します）<br>
+・<b>2つ目以降</b>のマーカー → 「♪²」「♪³」…という番号付きボタンになり、下の「切り替え方式」で選んだ方式で次の曲に切り替わります。番号は末尾の曲名リストと対応しています
 </div>
 
 <h2>本文</h2>
@@ -148,7 +148,7 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
         } else {
           fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
         }
-        playBtn.textContent = '▶';
+        playBtn.classList.remove('playing');
       } else {
         if (IS_IOS) {
           player.unMute();
@@ -159,7 +159,7 @@ var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
           player.playVideo();
           fadeVolume(player, 0, 100, PLAYPAUSE_MS);
         }
-        playBtn.textContent = '⏸';
+        playBtn.classList.add('playing');
       }
     });
   }
@@ -352,14 +352,14 @@ document.getElementById('generateBtn').addEventListener('click', async function 
   var rawParagraphs = escaped.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
 
   var bodyHtml;
-  var style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n</style>';
+  var style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.music-btn sup {\n  font-size: 0.65em;\n}\n.music-btn.playing {\n  background: #333;\n  color: #fff;\n  border-color: #333;\n}\n</style>';
 
   if (mode === 'tap') {
     var bodyParts = rawParagraphs.map(function (p, i) {
       var transitionIndices = [];
       var htmlP = p.replace(/@@MUSIC(\d+)@@/g, function (whole, idxStr) {
         var idx = parseInt(idxStr, 10);
-        if (idx === 0) return '<button id="playBtn1" class="music-btn">▶</button>';
+        if (idx === 0) return '<button id="playBtn1" class="music-btn">♪<sup>1</sup></button>';
         transitionIndices.push(idx);
         return '';
       }).replace(/\n/g, '<br>\n');
@@ -369,16 +369,16 @@ document.getElementById('generateBtn').addEventListener('click', async function 
       return '<p ' + attrs + '>' + htmlP + '</p>';
     });
     bodyHtml = bodyParts.join('\n\n') + '\n\n<div id="continueBtn" class="continue-btn">▼</div>';
-    style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.reveal-p {\n  transition: opacity 0.8s ease;\n}\n.continue-btn {\n  text-align: center;\n  font-size: 1.6em;\n  color: #999;\n  cursor: pointer;\n  padding: 24px 0;\n  user-select: none;\n  animation: musicblog-pulse 1.6s ease-in-out infinite;\n}\n@keyframes musicblog-pulse {\n  0%, 100% { opacity: 0.35; }\n  50% { opacity: 1; }\n}\n</style>';
+    style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.music-btn sup {\n  font-size: 0.65em;\n}\n.music-btn.playing {\n  background: #333;\n  color: #fff;\n  border-color: #333;\n}\n.reveal-p {\n  transition: opacity 0.8s ease;\n}\n.continue-btn {\n  text-align: center;\n  font-size: 1.6em;\n  color: #999;\n  cursor: pointer;\n  padding: 24px 0;\n  user-select: none;\n  animation: musicblog-pulse 1.6s ease-in-out infinite;\n}\n@keyframes musicblog-pulse {\n  0%, 100% { opacity: 0.35; }\n  50% { opacity: 1; }\n}\n</style>';
   } else {
     bodyHtml = rawParagraphs.map(function (p) {
       return '<p>' + p.replace(/\n/g, '<br>\n') + '</p>';
     }).join('\n\n');
     bodyHtml = bodyHtml.replace(/@@MUSIC(\d+)@@/g, function (whole, idxStr) {
       var idx = parseInt(idxStr, 10);
-      if (idx === 0) return '<button id="playBtn1" class="music-btn">▶</button>';
+      if (idx === 0) return '<button id="playBtn1" class="music-btn">♪<sup>1</sup></button>';
       return '<span id="marker' + idx + '" style="display:inline-block;width:0;height:1px;"></span>' +
-             '<button class="music-btn transition-btn" data-target="' + idx + '">⏭</button>';
+             '<button class="music-btn transition-btn" data-target="' + idx + '">♪<sup>' + (idx + 1) + '</sup></button>';
     });
   }
 
@@ -386,10 +386,10 @@ document.getElementById('generateBtn').addEventListener('click', async function 
     var creditItems = tracks.map(function (t, i) {
       var m = metas[i];
       var label = m ? (m.title + (m.author ? '　/　' + m.author : '')) : t.id;
-      return '<li>' + escapeHtml(label) + '</li>';
+      return '<li>♪<sup>' + (i + 1) + '</sup>　' + escapeHtml(label) + '</li>';
     }).join('\n');
     var creditsAttrs = mode === 'tap' ? ' id="creditsBlock" style="display:none;opacity:0;transition:opacity 0.8s ease;"' : '';
-    var creditsBlock = '<div' + creditsAttrs + '>\n<p style="font-size:0.85em;color:#888;margin-bottom:4px;">この記事で使用した曲</p>\n<ol style="font-size:0.85em;color:#888;">\n' + creditItems + '\n</ol>\n</div>';
+    var creditsBlock = '<div' + creditsAttrs + '>\n<p style="font-size:0.85em;color:#888;margin-bottom:4px;">この記事で使用した曲</p>\n<ul style="font-size:0.85em;color:#888;list-style:none;padding:0;">\n' + creditItems + '\n</ul>\n</div>';
     bodyHtml = bodyHtml + '\n\n' + creditsBlock;
   }
 

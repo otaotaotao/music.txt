@@ -14,11 +14,11 @@
 <p>中目黒から、天空庭園まで歩くことにした。</p>
 
 <p>団地のちいさな公園で写真をとったり、お寺とか、また団地のちいさな公園とか。<br>
-自転車にのった小学生が、鼻歌をうたって眼の前を横切った。曲は、<button id="playBtn1" class="music-btn">▶</button></p>
+自転車にのった小学生が、鼻歌をうたって眼の前を横切った。曲は、<button id="playBtn1" class="music-btn">♪<sup>1</sup></button></p>
 
 <p>坂の多い道を歩く。ガクアジサイ、大きな野良猫。ピンクと黄色の花を通りすぎたところに、ピンクと黄色の服を着た小学生。</p>
 
-<p><span id="marker1" style="display:inline-block;width:0;height:1px;"></span><button class="music-btn transition-btn" data-target="1">⏭</button></p>
+<p><span id="marker1" style="display:inline-block;width:0;height:1px;"></span><button class="music-btn transition-btn" data-target="1">♪<sup>2</sup></button></p>
 
 <p>天空庭園にたどりつき、のぼっていく。ブドウとか、なにかの実とか。頂上のベンチでひとやすみ。梅雨の曇り空が広い。</p>
 
@@ -26,7 +26,7 @@
 
 <p>夜になった街を歩く。路地を行き、神社にたどりつく。茅の輪がまたあった。三度まわってくぐったり、絵馬を読んだり。</p>
 
-<p><span id="marker2" style="display:inline-block;width:0;height:1px;"></span><button class="music-btn transition-btn" data-target="2">⏭</button></p>
+<p><span id="marker2" style="display:inline-block;width:0;height:1px;"></span><button class="music-btn transition-btn" data-target="2">♪<sup>3</sup></button></p>
 
 <p>景色の良い階段にすわって、あの映画に出てくる音楽をきいた。</p>
 
@@ -34,11 +34,11 @@
 
 <div>
 <p style="font-size:0.85em;color:#888;margin-bottom:4px;">この記事で使用した曲</p>
-<ol style="font-size:0.85em;color:#888;">
-<li>Lady Gaga - Poker Face (Official Music Video)　/　LadyGagaVEVO</li>
-<li>Ayatake Ezaki - The Beginning Night (Full Album, 2023)　/　Ayatake Ezaki</li>
-<li>NYC Tonight (Sakamoto Ver)　/　s</li>
-</ol>
+<ul style="font-size:0.85em;color:#888;list-style:none;padding:0;">
+<li>♪<sup>1</sup>　Lady Gaga - Poker Face (Official Music Video)　/　LadyGagaVEVO</li>
+<li>♪<sup>2</sup>　Ayatake Ezaki - The Beginning Night (Full Album, 2023)　/　Ayatake Ezaki</li>
+<li>♪<sup>3</sup>　NYC Tonight (Sakamoto Ver)　/　s</li>
+</ul>
 </div>
 
 <link rel="preconnect" href="https://www.youtube.com">
@@ -104,7 +104,7 @@
         } else {
           fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
         }
-        playBtn.textContent = '▶';
+        playBtn.classList.remove('playing');
       } else {
         if (IS_IOS) {
           player.unMute();
@@ -115,7 +115,7 @@
           player.playVideo();
           fadeVolume(player, 0, 100, PLAYPAUSE_MS);
         }
-        playBtn.textContent = '⏸';
+        playBtn.classList.add('playing');
       }
     });
   }
@@ -195,6 +195,14 @@
   border: 1px solid #ccc;
   background: #f7f7f7;
   cursor: pointer;
+}
+.music-btn sup {
+  font-size: 0.65em;
+}
+.music-btn.playing {
+  background: #333;
+  color: #fff;
+  border-color: #333;
 }
 </style>
 
