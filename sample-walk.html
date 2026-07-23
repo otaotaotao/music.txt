@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>中目黒から天空庭園まで</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; line-height: 1.9; color: #222; font-size: 1.05em; }
+  p { margin: 1.6em 0; }
+</style>
+</head>
+<body>
+
+<p>中目黒から、天空庭園まで歩くことにした。</p>
+
+<p>団地のちいさな公園で写真をとったり、お寺とか、また団地のちいさな公園とか。<br>
+自転車にのった小学生が、鼻歌をうたって眼の前を横切った。曲は、<button id="playBtn1" class="music-btn">▶</button></p>
+
+<p>坂の多い道を歩く。ガクアジサイ、大きな野良猫。ピンクと黄色の花を通りすぎたところに、ピンクと黄色の服を着た小学生。</p>
+
+<p><span id="marker1" style="display:inline-block;width:0;height:1px;"></span><button class="music-btn transition-btn" data-target="1">⏭</button></p>
+
+<p>天空庭園にたどりつき、のぼっていく。ブドウとか、なにかの実とか。頂上のベンチでひとやすみ。梅雨の曇り空が広い。</p>
+
+<p>しばらく過ごして、晩ごはんは近くの台湾料理店。マンゴービール、おつまみ色々。おいしかった。</p>
+
+<p>夜になった街を歩く。路地を行き、神社にたどりつく。茅の輪がまたあった。三度まわってくぐったり、絵馬を読んだり。</p>
+
+<p><span id="marker2" style="display:inline-block;width:0;height:1px;"></span><button class="music-btn transition-btn" data-target="2">⏭</button></p>
+
+<p>景色の良い階段にすわって、あの映画に出てくる音楽をきいた。</p>
+
+<p>雨がぽつぽつとふってきた。階段をくだって、鳥居をくぐって、駅にむかった。映画と同じ夜の道を、ひとつの傘で歩いた。</p>
+
+<div id="ytA" style="position:absolute; width:0; height:0; overflow:hidden;"></div>
+<div id="ytB" style="position:absolute; width:0; height:0; overflow:hidden;"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+(function () {
+  var TRACKS = [{"id":"bESGLojNYSo","start":56},{"id":"YJdKJ8i34wM","start":0},{"id":"BAYlWYKsm94","start":0}];
+  var CROSSFADE_MS = 3000;
+  var PLAYPAUSE_MS = 1200;
+
+  var players = [];
+  var readyCount = 0;
+  var currentSlot = 0;
+  var currentTrackIndex = 0;
+  var fadeTimer = null;
+  var transitionedUpTo = 0;
+
+  function fadeVolume(player, from, to, duration, onDone) {
+    if (fadeTimer) clearInterval(fadeTimer);
+    var steps = 30, i = 0;
+    fadeTimer = setInterval(function () {
+      i++;
+      var t = i / steps;
+      player.setVolume(Math.round(from + (to - from) * t));
+      if (i >= steps) {
+        clearInterval(fadeTimer);
+        fadeTimer = null;
+        if (onDone) onDone();
+      }
+    }, duration / steps);
+  }
+
+  function onYouTubeIframeAPIReady() {
+    players[0] = new YT.Player('ytA', {
+      height: '0', width: '0', videoId: TRACKS[0].id,
+      playerVars: { autoplay: 0, controls: 0, start: TRACKS[0].start },
+      events: { onReady: onPlayerReady }
+    });
+    if (TRACKS.length > 1) {
+      players[1] = new YT.Player('ytB', {
+        height: '0', width: '0', videoId: TRACKS[1].id,
+        playerVars: { autoplay: 0, controls: 0, start: TRACKS[1].start },
+        events: { onReady: onPlayerReady }
+      });
+    }
+  }
+  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+  function onPlayerReady() { readyCount++; }
+  function allReady() { return TRACKS.length > 1 ? readyCount === 2 : readyCount === 1; }
+
+  var playBtn = document.getElementById('playBtn1');
+  if (playBtn) {
+    playBtn.addEventListener('click', function () {
+      if (!allReady()) return;
+      var player = players[currentSlot];
+      if (player.getPlayerState() === 1) {
+        fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
+        playBtn.textContent = '▶';
+      } else {
+        player.setVolume(0);
+        player.playVideo();
+        fadeVolume(player, 0, 100, PLAYPAUSE_MS);
+        playBtn.textContent = '⏸';
+      }
+    });
+  }
+
+  function crossfadeTo(targetIndex) {
+    if (!allReady()) return;
+    if (targetIndex !== currentTrackIndex + 1) return;
+    if (transitionedUpTo >= targetIndex) return;
+    var fromPlayer = players[currentSlot];
+    if (fromPlayer.getPlayerState() !== 1) return;
+    transitionedUpTo = targetIndex;
+
+    var toSlot = 1 - currentSlot;
+    var toPlayer = players[toSlot];
+    toPlayer.setVolume(0);
+    toPlayer.playVideo();
+
+    var steps = 30, i = 0;
+    var iv = setInterval(function () {
+      i++;
+      var t = i / steps;
+      fromPlayer.setVolume(Math.max(0, Math.round(100 * (1 - t))));
+      toPlayer.setVolume(Math.min(100, Math.round(100 * t)));
+      if (i >= steps) {
+        clearInterval(iv);
+        fromPlayer.pauseVideo();
+        currentSlot = toSlot;
+        currentTrackIndex = targetIndex;
+        var lookahead = currentTrackIndex + 1;
+        if (lookahead < TRACKS.length) {
+          fromPlayer.cueVideoById({ videoId: TRACKS[lookahead].id, startSeconds: TRACKS[lookahead].start });
+        }
+        var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
+        if (btn) btn.style.display = 'none';
+      }
+    }, CROSSFADE_MS / steps);
+  }
+
+  TRACKS.forEach(function (t, idx) {
+    if (idx === 0) return;
+    var marker = document.getElementById('marker' + idx);
+    if (marker) {
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) crossfadeTo(idx);
+        });
+      }, { threshold: 0, rootMargin: '-40% 0px -40% 0px' });
+      obs.observe(marker);
+    }
+    var btn = document.querySelector('.transition-btn[data-target="' + idx + '"]');
+    if (btn) btn.addEventListener('click', function () { crossfadeTo(idx); });
+  });
+})();
+</script>
+
+<style>
+.music-btn {
+  font-size: 1em;
+  margin-left: 6px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+</style>
+
+</body>
+</html>

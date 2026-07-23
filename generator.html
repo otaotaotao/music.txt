@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ブログ音楽ジェネレーター</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; line-height: 1.7; color: #222; }
+  h1 { font-size: 1.3em; }
+  h2 { font-size: 1.05em; margin-top: 28px; }
+  .box { background: #f7f7f7; border: 1px solid #ddd; border-radius: 6px; padding: 14px 16px; margin: 10px 0; }
+  textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 0.9em; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
+  #inputText { height: 260px; }
+  #outputHtml { height: 260px; background: #fafafa; }
+  button.main { font-size: 1em; padding: 8px 20px; border-radius: 6px; border: 1px solid #888; background: #333; color: #fff; cursor: pointer; margin-top: 8px; }
+  button.main:hover { background: #555; }
+  #copyBtn { padding: 6px 14px; border-radius: 6px; border: 1px solid #888; background: #fff; cursor: pointer; }
+  #errorMsg { display:none; background: #fff0f0; border: 1px solid #e88; color: #a33; padding: 10px 14px; border-radius: 6px; margin: 10px 0; }
+  #result { display: none; }
+  code { background: #eee; padding: 1px 5px; border-radius: 3px; }
+  #trackList li { margin-bottom: 4px; }
+  #copyStatus { margin-left: 8px; color: #2a2; font-size: 0.9em; }
+  .mode-option { display: block; margin: 8px 0; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; }
+  .mode-option:hover { background: #f0f0f0; }
+  .mode-option small { display: block; color: #777; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1>ブログ音楽ジェネレーター</h1>
+<div class="box">
+本文を下のテキストエリアに貼り付けて、曲を入れたい場所に<br>
+<code>[[YouTubeのURL]]</code><br>
+と書いてください（文中でもOK。今回の例文もそのまま入っています）。<br><br>
+・<b>1つ目</b>のマーカー → 「▶」ボタン（クリックで再生・もう一度押すと⏸で停止／フェード付き）<br>
+・<b>2つ目以降</b>のマーカー → 下の「切り替え方式」で選んだ方式で次の曲に切り替わります
+</div>
+
+<h2>本文</h2>
+<textarea id="inputText">中目黒から、天空庭園まで歩くことにした。
+
+団地のちいさな公園で写真をとったり、お寺とか、また団地のちいさな公園とか。
+自転車にのった小学生が、鼻歌をうたって眼の前を横切った。曲は、[[https://youtu.be/bESGLojNYSo?si=lrfHYPc4IGwbQvWt&t=56]]
+
+坂の多い道を歩く。ガクアジサイ、大きな野良猫。ピンクと黄色の花を通りすぎたところに、ピンクと黄色の服を着た小学生。
+
+[[https://www.youtube.com/watch?v=YJdKJ8i34wM]]
+
+天空庭園にたどりつき、のぼっていく。ブドウとか、なにかの実とか。頂上のベンチでひとやすみ。梅雨の曇り空が広い。
+
+しばらく過ごして、晩ごはんは近くの台湾料理店。マンゴービール、おつまみ色々。おいしかった。
+
+夜になった街を歩く。路地を行き、神社にたどりつく。茅の輪がまたあった。三度まわってくぐったり、絵馬を読んだり。
+
+[[https://www.youtube.com/watch?v=BAYlWYKsm94]]
+
+景色の良い階段にすわって、あの映画に出てくる音楽をきいた。
+
+雨がぽつぽつとふってきた。階段をくだって、鳥居をくぐって、駅にむかった。映画と同じ夜の道を、ひとつの傘で歩いた。</textarea>
+
+<h2>切り替え方式</h2>
+<label class="mode-option">
+  <input type="radio" name="mode" value="manual">
+  1. 手動のみ<small>スクロールでは切り替わりません。読者が⏭ボタンを押したときだけ次の曲に切り替わります。</small>
+</label>
+<label class="mode-option">
+  <input type="radio" name="mode" value="auto" checked>
+  2. 自動トランジション<small>その段落までスクロールすると自動でクロスフェード。念のため⏭ボタンも表示されます（PCなど自動発火しない画面向けの保険）。</small>
+</label>
+<label class="mode-option">
+  <input type="radio" name="mode" value="tap">
+  3. 段落タップ送り<small>最初の段落だけ表示され、「▼」をタップするたびに次の段落が現れます。曲の切り替えもタップに連動します。読み方自体が変わる形式です。</small>
+</label>
+
+<br>
+<button class="main" id="generateBtn">HTMLを生成する</button>
+<div id="errorMsg"></div>
+
+<div id="result">
+  <h2>検出した曲</h2>
+  <ol id="trackList"></ol>
+
+  <h2>生成されたHTML</h2>
+  <p>このままコピーして、はてなブログの記事編集画面で「HTML編集」に切り替えて貼り付けてください。</p>
+  <textarea id="outputHtml" readonly></textarea>
+  <br>
+  <button id="copyBtn">コピーする</button>
+  <span id="copyStatus"></span>
+</div>
+
+<script>
+var RUNTIME_CORE = `  var TRACKS = __TRACKS_JSON__;
+  var CROSSFADE_MS = 3000;
+  var PLAYPAUSE_MS = 1200;
+
+  var players = [];
+  var readyCount = 0;
+  var currentSlot = 0;
+  var currentTrackIndex = 0;
+  var fadeTimer = null;
+  var transitionedUpTo = 0;
+
+  function fadeVolume(player, from, to, duration, onDone) {
+    if (fadeTimer) clearInterval(fadeTimer);
+    var steps = 30, i = 0;
+    fadeTimer = setInterval(function () {
+      i++;
+      var t = i / steps;
+      player.setVolume(Math.round(from + (to - from) * t));
+      if (i >= steps) {
+        clearInterval(fadeTimer);
+        fadeTimer = null;
+        if (onDone) onDone();
+      }
+    }, duration / steps);
+  }
+
+  function onYouTubeIframeAPIReady() {
+    players[0] = new YT.Player('ytA', {
+      height: '0', width: '0', videoId: TRACKS[0].id,
+      playerVars: { autoplay: 0, controls: 0, start: TRACKS[0].start },
+      events: { onReady: onPlayerReady }
+    });
+    if (TRACKS.length > 1) {
+      players[1] = new YT.Player('ytB', {
+        height: '0', width: '0', videoId: TRACKS[1].id,
+        playerVars: { autoplay: 0, controls: 0, start: TRACKS[1].start },
+        events: { onReady: onPlayerReady }
+      });
+    }
+  }
+  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+  function onPlayerReady() { readyCount++; }
+  function allReady() { return TRACKS.length > 1 ? readyCount === 2 : readyCount === 1; }
+
+  var playBtn = document.getElementById('playBtn1');
+  if (playBtn) {
+    playBtn.addEventListener('click', function () {
+      if (!allReady()) return;
+      var player = players[currentSlot];
+      if (player.getPlayerState() === 1) {
+        fadeVolume(player, 100, 0, PLAYPAUSE_MS, function () { player.pauseVideo(); });
+        playBtn.textContent = '▶';
+      } else {
+        player.setVolume(0);
+        player.playVideo();
+        fadeVolume(player, 0, 100, PLAYPAUSE_MS);
+        playBtn.textContent = '⏸';
+      }
+    });
+  }
+
+  function crossfadeTo(targetIndex) {
+    if (!allReady()) return;
+    if (targetIndex !== currentTrackIndex + 1) return;
+    if (transitionedUpTo >= targetIndex) return;
+    var fromPlayer = players[currentSlot];
+    if (fromPlayer.getPlayerState() !== 1) return;
+    transitionedUpTo = targetIndex;
+
+    var toSlot = 1 - currentSlot;
+    var toPlayer = players[toSlot];
+    toPlayer.setVolume(0);
+    toPlayer.playVideo();
+
+    var steps = 30, i = 0;
+    var iv = setInterval(function () {
+      i++;
+      var t = i / steps;
+      fromPlayer.setVolume(Math.max(0, Math.round(100 * (1 - t))));
+      toPlayer.setVolume(Math.min(100, Math.round(100 * t)));
+      if (i >= steps) {
+        clearInterval(iv);
+        fromPlayer.pauseVideo();
+        currentSlot = toSlot;
+        currentTrackIndex = targetIndex;
+        var lookahead = currentTrackIndex + 1;
+        if (lookahead < TRACKS.length) {
+          fromPlayer.cueVideoById({ videoId: TRACKS[lookahead].id, startSeconds: TRACKS[lookahead].start });
+        }
+        var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
+        if (btn) btn.style.display = 'none';
+      }
+    }, CROSSFADE_MS / steps);
+  }
+`;
+
+var RUNTIME_TRIGGER_MANUAL = `
+  TRACKS.forEach(function (t, idx) {
+    if (idx === 0) return;
+    var btn = document.querySelector('.transition-btn[data-target="' + idx + '"]');
+    if (btn) btn.addEventListener('click', function () { crossfadeTo(idx); });
+  });
+`;
+
+var RUNTIME_TRIGGER_AUTO = `
+  TRACKS.forEach(function (t, idx) {
+    if (idx === 0) return;
+    var marker = document.getElementById('marker' + idx);
+    if (marker) {
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) crossfadeTo(idx);
+        });
+      }, { threshold: 0, rootMargin: '-40% 0px -40% 0px' });
+      obs.observe(marker);
+    }
+    var btn = document.querySelector('.transition-btn[data-target="' + idx + '"]');
+    if (btn) btn.addEventListener('click', function () { crossfadeTo(idx); });
+  });
+`;
+
+var RUNTIME_TRIGGER_TAP = `
+  var revealParas = Array.prototype.slice.call(document.querySelectorAll('.reveal-p'));
+  var pointer = 1;
+  var continueBtn = document.getElementById('continueBtn');
+  function revealNext() {
+    if (pointer >= revealParas.length) return;
+    var p = revealParas[pointer];
+    p.style.display = 'block';
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { p.style.opacity = 1; });
+    });
+    var transAttr = p.getAttribute('data-transition');
+    if (transAttr) {
+      transAttr.split(',').forEach(function (idxStr) { crossfadeTo(parseInt(idxStr, 10)); });
+    }
+    setTimeout(function () { p.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
+    pointer++;
+    if (pointer >= revealParas.length && continueBtn) continueBtn.style.display = 'none';
+  }
+  if (continueBtn) continueBtn.addEventListener('click', revealNext);
+`;
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function parseTimeParam(t) {
+  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  var m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(t);
+  if (!m) return 0;
+  return (parseInt(m[1] || 0, 10) * 3600) + (parseInt(m[2] || 0, 10) * 60) + parseInt(m[3] || 0, 10);
+}
+
+function parseYouTubeInput(input) {
+  input = (input || '').trim().replace(/^music\s*:\s*/i, '');
+  if (/^[\w-]{11}$/.test(input)) return { id: input, start: 0 };
+  try {
+    var url = new URL(input);
+    var id = null;
+    if (url.hostname === 'youtu.be') {
+      id = url.pathname.slice(1);
+    } else if (url.hostname.indexOf('youtube.com') !== -1) {
+      id = url.searchParams.get('v') ||
+           (url.pathname.indexOf('/embed/') === 0 ? url.pathname.split('/embed/')[1] : null);
+    }
+    var t = url.searchParams.get('t') || url.searchParams.get('start') || '0';
+    return { id: id, start: parseTimeParam(t) };
+  } catch (e) {
+    return { id: null, start: 0 };
+  }
+}
+
+document.getElementById('generateBtn').addEventListener('click', function () {
+  var raw = document.getElementById('inputText').value;
+  var mode = document.querySelector('input[name="mode"]:checked').value;
+  var markerRe = /\[\[\s*([^\]]+?)\s*\]\]/g;
+  var tracks = [];
+  var invalidUrls = [];
+
+  var tokenized = raw.replace(markerRe, function (whole, urlPart) {
+    var parsed = parseYouTubeInput(urlPart);
+    var idx = tracks.length;
+    if (!parsed.id) invalidUrls.push(urlPart.trim());
+    tracks.push(parsed);
+    return '@@MUSIC' + idx + '@@';
+  });
+
+  var resultEl = document.getElementById('result');
+  var errorEl = document.getElementById('errorMsg');
+
+  if (tracks.length === 0) {
+    errorEl.textContent = '[[ YouTubeのURL ]] の形式で、曲を入れたい場所にマーカーを書いてください。';
+    errorEl.style.display = 'block';
+    resultEl.style.display = 'none';
+    return;
+  }
+  if (invalidUrls.length > 0) {
+    errorEl.textContent = '次のURLからYouTubeの動画IDを読み取れませんでした: ' + invalidUrls.join(' / ');
+    errorEl.style.display = 'block';
+    resultEl.style.display = 'none';
+    return;
+  }
+  errorEl.style.display = 'none';
+
+  var escaped = escapeHtml(tokenized);
+  var rawParagraphs = escaped.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
+
+  var bodyHtml;
+  var style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n</style>';
+
+  if (mode === 'tap') {
+    var bodyParts = rawParagraphs.map(function (p, i) {
+      var transitionIndices = [];
+      var htmlP = p.replace(/@@MUSIC(\d+)@@/g, function (whole, idxStr) {
+        var idx = parseInt(idxStr, 10);
+        if (idx === 0) return '<button id="playBtn1" class="music-btn">▶</button>';
+        transitionIndices.push(idx);
+        return '';
+      }).replace(/\n/g, '<br>\n');
+      var initStyle = i === 0 ? 'display:block;opacity:1;' : 'display:none;opacity:0;';
+      var attrs = 'class="reveal-p" data-idx="' + i + '" style="' + initStyle + '"';
+      if (transitionIndices.length) attrs += ' data-transition="' + transitionIndices.join(',') + '"';
+      return '<p ' + attrs + '>' + htmlP + '</p>';
+    });
+    bodyHtml = bodyParts.join('\n\n') + '\n\n<div id="continueBtn" class="continue-btn">▼</div>';
+    style = '<style>\n.music-btn {\n  font-size: 1em;\n  margin-left: 6px;\n  padding: 2px 10px;\n  border-radius: 4px;\n  border: 1px solid #ccc;\n  background: #f7f7f7;\n  cursor: pointer;\n}\n.reveal-p {\n  transition: opacity 0.8s ease;\n}\n.continue-btn {\n  text-align: center;\n  font-size: 1.6em;\n  color: #999;\n  cursor: pointer;\n  padding: 24px 0;\n  user-select: none;\n  animation: musicblog-pulse 1.6s ease-in-out infinite;\n}\n@keyframes musicblog-pulse {\n  0%, 100% { opacity: 0.35; }\n  50% { opacity: 1; }\n}\n</style>';
+  } else {
+    bodyHtml = rawParagraphs.map(function (p) {
+      return '<p>' + p.replace(/\n/g, '<br>\n') + '</p>';
+    }).join('\n\n');
+    bodyHtml = bodyHtml.replace(/@@MUSIC(\d+)@@/g, function (whole, idxStr) {
+      var idx = parseInt(idxStr, 10);
+      if (idx === 0) return '<button id="playBtn1" class="music-btn">▶</button>';
+      return '<span id="marker' + idx + '" style="display:inline-block;width:0;height:1px;"></span>' +
+             '<button class="music-btn transition-btn" data-target="' + idx + '">⏭</button>';
+    });
+  }
+
+  var tracksJson = JSON.stringify(tracks).replace(/</g, '\\u003c');
+  var trigger = mode === 'manual' ? RUNTIME_TRIGGER_MANUAL : (mode === 'tap' ? RUNTIME_TRIGGER_TAP : RUNTIME_TRIGGER_AUTO);
+  var script = '(function () {\n' + RUNTIME_CORE.replace('__TRACKS_JSON__', tracksJson) + trigger + '})();';
+
+  var playerDivs = '<div id="ytA" style="position:absolute; width:0; height:0; overflow:hidden;"></div>\n' +
+    (tracks.length > 1 ? '<div id="ytB" style="position:absolute; width:0; height:0; overflow:hidden;"></div>\n' : '');
+
+  var finalHtml = bodyHtml + '\n\n' + playerDivs + '\n<script src="https://www.youtube.com/iframe_api"><\/script>\n<script>\n' + script + '\n<\/script>\n\n' + style;
+
+  document.getElementById('outputHtml').value = finalHtml;
+
+  var listEl = document.getElementById('trackList');
+  listEl.innerHTML = '';
+  tracks.forEach(function (t, idx) {
+    var li = document.createElement('li');
+    li.textContent = (idx === 0 ? '再生ボタン: ' : idx + '曲目へのトランジション: ') + t.id + (t.start ? ' (' + t.start + '秒から)' : '');
+    listEl.appendChild(li);
+  });
+
+  resultEl.style.display = 'block';
+});
+
+document.getElementById('copyBtn').addEventListener('click', function () {
+  var ta = document.getElementById('outputHtml');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(function () {
+    var status = document.getElementById('copyStatus');
+    status.textContent = 'コピーしました！';
+    setTimeout(function () { status.textContent = ''; }, 2000);
+  });
+});
+</script>
+
+</body>
+</html>
