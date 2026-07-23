@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ブログ音楽ジェネレーター</title>
+<title>Blog Music Generator</title>
 <style>
   body { font-family: -apple-system, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; line-height: 1.7; color: #222; }
   h1 { font-size: 1.3em; }
@@ -26,70 +26,70 @@
 </head>
 <body>
 
-<h1>ブログ音楽ジェネレーター</h1>
+<h1>Blog Music Generator</h1>
 <div class="box">
-本文を下のテキストエリアに貼り付けて、曲を入れたい場所に<br>
+Paste your post text into the box below, and write<br>
 <code>[[URL]]</code><br>
-と書いてください（文中でもOK）。<br><br>
-対応サービス:<br>
-・<b>YouTube / SoundCloud</b> → 非表示プレイヤーで再生。1つ目は「♪¹」ボタン（再生・停止・フェード付き）、2つ目以降は番号付きボタンで自動/手動切り替え<br>
-・<b>Spotify / Apple Music / Bandcamp</b> → その場に見える通常の埋め込みプレイヤーを設置（ネイティブの再生ボタンで聴く形式。フェードや自動切り替えの対象にはなりません）
+wherever you want a track to play (works fine mid-sentence too).<br><br>
+Supported services:<br>
+・<b>YouTube / SoundCloud</b> → played through a hidden player. The first one becomes a "♪¹" button (play/pause with a fade); every one after that becomes a numbered button that switches tracks automatically or manually<br>
+・<b>Spotify / Apple Music / Bandcamp</b> → shown as a normal, visible embedded player right there in the text (played with that service's own controls; not part of the fade or auto-switching system)
 </div>
 
-<h2>本文</h2>
-<textarea id="inputText">中目黒から、天空庭園まで歩くことにした。
+<h2>Post text</h2>
+<textarea id="inputText">I decided to walk from the station to the hilltop garden.
 
-団地のちいさな公園で写真をとったり、お寺とか、また団地のちいさな公園とか。
-自転車にのった小学生が、鼻歌をうたって眼の前を横切った。曲は、[[https://youtu.be/bESGLojNYSo?si=lrfHYPc4IGwbQvWt&t=56]]
+I took some photos in a small park by the old apartment blocks, then passed a temple, then another small park.
+A kid on a bicycle crossed in front of me, humming a tune. It was that song. [[https://youtu.be/bESGLojNYSo?si=lrfHYPc4IGwbQvWt&t=56]]
 
-坂の多い道を歩く。ガクアジサイ、大きな野良猫。ピンクと黄色の花を通りすぎたところに、ピンクと黄色の服を着た小学生。
+The road got steeper. Hydrangeas, a big stray cat. Just past some pink and yellow flowers, a kid in a pink and yellow jacket.
 
 [[https://www.youtube.com/watch?v=YJdKJ8i34wM]]
 
-天空庭園にたどりつき、のぼっていく。ブドウとか、なにかの実とか。頂上のベンチでひとやすみ。梅雨の曇り空が広い。
+I reached the garden and climbed up. Grapes, some other fruit I couldn't name. Rested on a bench at the top. The rainy-season sky stretched out wide and grey.
 
-しばらく過ごして、晩ごはんは近くの台湾料理店。マンゴービール、おつまみ色々。おいしかった。
+Later, dinner was at a Taiwanese place nearby. Mango beer, a few small dishes. It was good.
 
-夜になった街を歩く。路地を行き、神社にたどりつく。茅の輪がまたあった。三度まわってくぐったり、絵馬を読んだり。
+Walked through the evening streets. Down an alley, to a shrine. There was a chinowa ring again — walked through it three times, read a few ema plaques.
 
 [[https://www.youtube.com/watch?v=BAYlWYKsm94]]
 
-景色の良い階段にすわって、あの映画に出てくる音楽をきいた。
+Sat on some steps with a good view and listened to the song from that movie.
 
-雨がぽつぽつとふってきた。階段をくだって、鳥居をくぐって、駅にむかった。映画と同じ夜の道を、ひとつの傘で歩いた。</textarea>
+Rain started, just a few drops. Down the steps, through the torii gate, toward the station. The same night road as in the movie, under one umbrella.</textarea>
 
-<h2>切り替え方式</h2>
+<h2>Switching mode</h2>
 <label class="mode-option">
   <input type="radio" name="mode" value="manual">
-  1. 手動のみ<small>スクロールでは切り替わりません。読者が番号付きボタン（♪²など）を押したときだけ次の曲に切り替わります。</small>
+  1. Manual only<small>Scrolling never switches tracks. Only tapping a numbered button (like ♪²) moves to the next track.</small>
 </label>
 <label class="mode-option">
   <input type="radio" name="mode" value="auto" checked>
-  2. 自動トランジション<small>その段落までスクロールすると自動でクロスフェード。念のため番号付きボタン（♪²など）も表示されます（PCなど自動発火しない画面向けの保険）。</small>
+  2. Auto transition<small>Scrolling to that paragraph crossfades automatically. A numbered button (like ♪²) is also shown, just in case (useful on wide screens where the auto trigger may not fire).</small>
 </label>
 <label class="mode-option">
   <input type="radio" name="mode" value="tap">
-  3. 段落タップ送り<small>最初の段落だけ表示され、「▼」をタップするたびに次の段落が現れます。曲の切り替えもタップに連動します。読み方自体が変わる形式です。</small>
+  3. Tap to reveal<small>Only the first paragraph is shown; tapping "▼" reveals the next one each time. Track switching is tied to that tap too — this changes the whole reading experience, not just the audio.</small>
 </label>
 
 <label class="mode-option">
   <input type="checkbox" id="creditsCheckbox" checked>
-  本文末尾に曲名・アーティスト名の一覧を追加する<small>各サービスから曲タイトルとアーティスト名を自動取得します（生成に少し時間がかかります）。</small>
+  Add a list of track titles and artists at the end<small>Fetched automatically from each service (this makes generating take a little longer).</small>
 </label>
 
 <br>
-<button class="main" id="generateBtn">HTMLを生成する</button>
+<button class="main" id="generateBtn">Generate HTML</button>
 <div id="errorMsg"></div>
 
 <div id="result">
-  <h2>検出した曲</h2>
+  <h2>Detected tracks</h2>
   <ol id="trackList"></ol>
 
-  <h2>生成されたHTML</h2>
-  <p>このままコピーして、はてなブログの記事編集画面で「HTML編集」に切り替えて貼り付けてください。</p>
+  <h2>Generated HTML</h2>
+  <p>Copy this as-is and paste it into your blog editor's HTML view.</p>
   <textarea id="outputHtml" readonly></textarea>
   <br>
-  <button id="copyBtn">コピーする</button>
+  <button id="copyBtn">Copy</button>
   <span id="copyStatus"></span>
 </div>
 
@@ -407,7 +407,7 @@ function fallbackLabel(platform, url) {
     var u = new URL(url);
     seg = decodeURIComponent((u.pathname.split('/').filter(Boolean).pop() || u.hostname)).replace(/[-_]/g, ' ');
   } catch (e) {}
-  return seg + '（' + (PLATFORM_NAMES[platform] || platform) + '）';
+  return seg + ' (' + (PLATFORM_NAMES[platform] || platform) + ')';
 }
 
 function buildVisibleEmbed(platform, url, meta) {
@@ -424,7 +424,7 @@ function buildVisibleEmbed(platform, url, meta) {
     var embedUrl = url.replace('music.apple.com', 'embed.music.apple.com');
     return '<div class="music-embed"><iframe allow="autoplay *; encrypted-media *; fullscreen *" frameborder="0" height="150" style="width:100%;overflow:hidden;border-radius:10px;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="' + embedUrl + '"></iframe></div>';
   }
-  var label = platform === 'bandcamp' ? 'Bandcampで聴く' : 'リンクを開く';
+  var label = platform === 'bandcamp' ? 'Listen on Bandcamp' : 'Open link';
   return '<div class="music-embed"><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="music-link">♪ ' + label + ' ↗</a></div>';
 }
 
@@ -470,13 +470,13 @@ document.getElementById('generateBtn').addEventListener('click', async function 
   var errorEl = document.getElementById('errorMsg');
 
   if (allTracks.length === 0) {
-    errorEl.textContent = '[[ URL ]] の形式で、曲を入れたい場所にマーカーを書いてください。';
+    errorEl.textContent = 'Add a marker like [[ URL ]] wherever you want a track to appear.';
     errorEl.style.display = 'block';
     resultEl.style.display = 'none';
     return;
   }
   if (invalidUrls.length > 0) {
-    errorEl.textContent = '次のURLを認識できませんでした（対応: YouTube / SoundCloud / Spotify / Apple Music / Bandcamp）: ' + invalidUrls.join(' / ');
+    errorEl.textContent = 'Could not recognize the following URL(s) (supported: YouTube / SoundCloud / Spotify / Apple Music / Bandcamp): ' + invalidUrls.join(' / ');
     errorEl.style.display = 'block';
     resultEl.style.display = 'none';
     return;
@@ -486,12 +486,12 @@ document.getElementById('generateBtn').addEventListener('click', async function 
   var metas = [];
   if (includeCredits) {
     genBtn.disabled = true;
-    genBtn.textContent = '曲情報を取得中...';
+    genBtn.textContent = 'Fetching track info...';
     metas = await Promise.all(allTracks.map(function (t) {
       return t.platform === 'invalid' ? Promise.resolve(null) : fetchTrackMeta(t.platform, t.url);
     }));
     genBtn.disabled = false;
-    genBtn.textContent = 'HTMLを生成する';
+    genBtn.textContent = 'Generate HTML';
   }
 
   var escaped = escapeHtml(tokenized);
@@ -549,12 +549,12 @@ document.getElementById('generateBtn').addEventListener('click', async function 
     var creditItems = allTracks.map(function (t, idx) {
       if (t.platform === 'invalid') return '';
       var m = metas[idx];
-      var label = m ? (m.title + (m.author ? '　/　' + m.author : '')) : fallbackLabel(t.platform, t.url);
-      var prefix = t.controllableIndex !== null ? ('♪<sup>' + (idx + 1) + '</sup>　') : '♪　';
+      var label = m ? (m.title + (m.author ? ' / ' + m.author : '')) : fallbackLabel(t.platform, t.url);
+      var prefix = t.controllableIndex !== null ? ('♪<sup>' + (idx + 1) + '</sup> ') : '♪ ';
       return '<li>' + prefix + escapeHtml(label) + '</li>';
     }).filter(function (s) { return s.length > 0; }).join('\n');
     var creditsAttrs = mode === 'tap' ? ' id="creditsBlock" style="display:none;opacity:0;transition:opacity 0.8s ease;"' : '';
-    var creditsBlock = '<div' + creditsAttrs + '>\n<p style="font-size:0.85em;color:#888;margin-bottom:4px;">この記事で使用した曲</p>\n<ul style="font-size:0.85em;color:#888;list-style:none;padding:0;">\n' + creditItems + '\n</ul>\n</div>';
+    var creditsBlock = '<div' + creditsAttrs + '>\n<p style="font-size:0.85em;color:#888;margin-bottom:4px;">Tracks used in this post</p>\n<ul style="font-size:0.85em;color:#888;list-style:none;padding:0;">\n' + creditItems + '\n</ul>\n</div>';
     bodyHtml = bodyHtml + '\n\n' + creditsBlock;
   }
 
@@ -596,8 +596,8 @@ document.getElementById('generateBtn').addEventListener('click', async function 
     if (t.platform === 'invalid') return;
     var li = document.createElement('li');
     var kind = t.controllableIndex !== null
-      ? (t.controllableIndex === 0 ? '再生ボタン' : t.controllableIndex + '曲目へのトランジション')
-      : '見える埋め込み';
+      ? (t.controllableIndex === 0 ? 'Play button' : 'Transition to track ' + (t.controllableIndex + 1))
+      : 'Visible embed';
     li.textContent = '[' + (PLATFORM_NAMES[t.platform] || t.platform) + '] ' + kind + ': ' + t.url;
     listEl.appendChild(li);
   });
@@ -610,7 +610,7 @@ document.getElementById('copyBtn').addEventListener('click', function () {
   ta.select();
   navigator.clipboard.writeText(ta.value).then(function () {
     var status = document.getElementById('copyStatus');
-    status.textContent = 'コピーしました！';
+    status.textContent = 'Copied!';
     setTimeout(function () { status.textContent = ''; }, 2000);
   });
 });
