@@ -52,7 +52,6 @@
   var TRACKS = [{"id":"bESGLojNYSo","start":56},{"id":"YJdKJ8i34wM","start":0},{"id":"BAYlWYKsm94","start":0}];
   var CROSSFADE_MS = 3000;
   var PLAYPAUSE_MS = 1200;
-  var IOS_SWITCH_MS = 400;
   var IS_IOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   var players = [];
@@ -77,17 +76,33 @@
     }, duration / steps);
   }
 
+  function tryPlayUntil(player, maxAttempts, onDone) {
+    var attempt = 0;
+    function attemptPlay() {
+      player.playVideo();
+      attempt++;
+      setTimeout(function () {
+        var playing = player.getPlayerState() === 1;
+        if (playing || attempt > maxAttempts) {
+          if (onDone) onDone(playing);
+        } else {
+          attemptPlay();
+        }
+      }, 300);
+    }
+    attemptPlay();
+  }
+
   function onPlayerReady(index) {
     playerReady[index] = true;
     if (IS_IOS) {
       var p = players[index];
       var startAt = (TRACKS[index] && TRACKS[index].start) || 0;
       p.mute();
-      p.playVideo();
-      setTimeout(function () {
+      tryPlayUntil(p, 1, function () {
         p.pauseVideo();
         p.seekTo(startAt, true);
-      }, 300);
+      });
     }
   }
 
@@ -123,7 +138,7 @@
         if (IS_IOS) {
           player.unMute();
           player.setVolume(100);
-          player.playVideo();
+          tryPlayUntil(player, 3, function () {});
         } else {
           player.setVolume(0);
           player.playVideo();
@@ -153,18 +168,20 @@
       }
       var btn = document.querySelector('.transition-btn[data-target="' + targetIndex + '"]');
       if (btn) btn.style.display = 'none';
+      if (playBtn) {
+        var sup = playBtn.querySelector('sup');
+        if (sup) sup.textContent = String(targetIndex + 1);
+      }
     }
 
     if (IS_IOS) {
       toPlayer.unMute();
       toPlayer.setVolume(100);
-      toPlayer.playVideo();
-      fromPlayer.mute();
-      setTimeout(function () {
+      tryPlayUntil(toPlayer, 3, function () {
+        fromPlayer.mute();
         fromPlayer.pauseVideo();
-        fromPlayer.unMute();
         finishSwap();
-      }, IOS_SWITCH_MS);
+      });
     } else {
       toPlayer.setVolume(0);
       toPlayer.playVideo();
